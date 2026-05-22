@@ -17,7 +17,9 @@ from src.simulate.tournament import simulate_tournament, aggregate
 
 N_SIMULATIONS = 10_000
 HALF_LIFE = 365.0  # dias
-PRIOR_LAMBDA = 8.0  # força do prior bayesiano (Elo + market value)
+PRIOR_LAMBDA = (
+    0.0  # MLE puro — validado por backtest (results/backtest.csv) como melhor
+)
 
 
 def main() -> None:
