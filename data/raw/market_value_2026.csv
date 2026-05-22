@@ -1,0 +1,56 @@
+team,market_value_gbp_m,source
+England,1180.00,givemesport_top30
+Spain,1090.00,givemesport_top30
+France,1040.00,givemesport_top30
+Portugal,851.53,givemesport_top30
+Brazil,770.85,givemesport_top30
+Argentina,631.48,givemesport_top30
+Italy,613.36,givemesport_top30
+Netherlands,609.13,givemesport_top30
+Germany,553.92,givemesport_top30
+Sweden,454.77,givemesport_top30
+Belgium,449.71,givemesport_top30
+Norway,424.50,givemesport_top30
+Denmark,334.68,givemesport_top30
+Morocco,308.28,givemesport_top30
+Uruguay,287.24,givemesport_top30
+Ecuador,276.54,givemesport_top30
+Colombia,267.68,givemesport_top30
+Croatia,266.67,givemesport_top30
+Senegal,251.92,givemesport_top30
+Turkey,250.40,givemesport_top30
+Switzerland,231.52,givemesport_top30
+Ukraine,213.14,givemesport_top30
+Ivory Coast,209.30,givemesport_top30
+Greece,208.33,givemesport_top30
+Serbia,207.32,givemesport_top30
+Algeria,205.59,givemesport_top30
+Austria,187.42,givemesport_top30
+Cameroon,183.80,givemesport_top30
+Poland,174.82,givemesport_top30
+Mexico,173.43,givemesport_top30
+Japan,155.00,estimate_espn20_eu_avg
+United States,145.00,estimate_espn22
+Ghana,210.00,beinsports_pointmention
+Paraguay,95.00,estimate_espn27
+Czech Republic,85.00,estimate_espn28
+Canada,80.00,estimate_espn29
+South Korea,75.00,estimate_espn30
+DR Congo,70.00,estimate_espn31
+Australia,65.00,estimate_espn32
+Egypt,60.00,estimate_espn33
+Uzbekistan,55.00,estimate_espn34
+Bosnia and Herzegovina,50.00,estimate_espn36
+Cape Verde,42.50,beinsports_52musd
+Haiti,42.00,beinsports_lt60musd
+Panama,38.00,estimate_espn37
+Iran,35.00,estimate_espn38
+Tunisia,32.00,estimate_espn40
+New Zealand,28.00,estimate_espn41
+Curacao,26.00,beinsports_32musd
+Saudi Arabia,25.00,estimate_espn43
+Iraq,22.00,estimate_espn44
+South Africa,20.00,estimate_espn45
+Scotland,170.00,estimate_espn26
+Jordan,13.00,espn_15_98m_eur
+Qatar,18.00,estimate_espn48
