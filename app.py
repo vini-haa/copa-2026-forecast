@@ -52,13 +52,14 @@ st.caption(
     "Dixon-Coles + Monte Carlo (10.000 simulações) · base: 4.421 partidas pós-2022"
 )
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
     [
         "🏅 Favoritos ao título",
         "🎯 Análise por grupo",
         "⚔️ Simulador de partida",
         "📊 Ataque × Defesa",
         "💰 Dados de entrada",
+        "📈 Calibração vs Mercado",
     ]
 )
 
@@ -340,9 +341,106 @@ with tab5:
     st.plotly_chart(fig, use_container_width=True)
 
 
+# ---------------------- TAB 6: CALIBRAÇÃO vs MERCADO ------------------------
+with tab6:
+    st.subheader("Como o modelo se compara às casas de aposta e prediction markets")
+    st.markdown(
+        "Comparação entre `P(Título)` do modelo e probabilidades implícitas de "
+        "**ESPN (consenso de casas)** e **Polymarket (prediction market)**. "
+        "Odds ESPN foram normalizadas para remover o overround (vig)."
+    )
+
+    calib = pd.read_csv(RESULTS / "calibration.csv")
+    calib = (
+        calib.sort_values("model_prob", ascending=False).head(20).reset_index(drop=True)
+    )
+
+    # Gráfico de barras comparativo
+    plot_df = calib.melt(
+        id_vars="team",
+        value_vars=["model_prob", "espn_prob", "poly_prob"],
+        var_name="fonte",
+        value_name="prob",
+    )
+    fonte_label = {
+        "model_prob": "Modelo (DC bayesiano)",
+        "espn_prob": "Mercado (ESPN)",
+        "poly_prob": "Polymarket",
+    }
+    plot_df["fonte"] = plot_df["fonte"].map(fonte_label)
+    fig = px.bar(
+        plot_df,
+        x="team",
+        y="prob",
+        color="fonte",
+        barmode="group",
+        labels={"prob": "P(campeão)", "team": "Seleção"},
+        height=500,
+    )
+    fig.update_layout(yaxis_tickformat=".1%", xaxis_tickangle=-45)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("**Edge = modelo − mercado** (>0 = modelo otimista; <0 = pessimista)")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("##### 🟢 Maiores edges positivos (modelo otimista)")
+        pos = (
+            calib[calib["market_prob"] > 0.005]
+            .sort_values("edge", ascending=False)
+            .head(10)
+        )
+        pos_show = pos[["team", "model_prob", "market_prob", "edge"]].copy()
+        for c in ["model_prob", "market_prob", "edge"]:
+            pos_show[c] = (pos_show[c] * 100).round(2)
+        st.dataframe(pos_show, use_container_width=True, hide_index=True)
+    with col2:
+        st.markdown("##### 🔴 Maiores edges negativos (modelo pessimista)")
+        neg = calib[calib["market_prob"] > 0.01].sort_values("edge").head(10)
+        neg_show = neg[["team", "model_prob", "market_prob", "edge"]].copy()
+        for c in ["model_prob", "market_prob", "edge"]:
+            neg_show[c] = (neg_show[c] * 100).round(2)
+        st.dataframe(neg_show, use_container_width=True, hide_index=True)
+
+    st.markdown("##### Scatter: mercado vs modelo")
+    full = pd.read_csv(RESULTS / "calibration.csv")
+    full = full[(full["market_prob"] > 0) & (full["model_prob"] > 0)]
+    fig2 = px.scatter(
+        full,
+        x="market_prob",
+        y="model_prob",
+        text="team",
+        log_x=True,
+        log_y=True,
+        labels={
+            "market_prob": "Mercado (média ESPN+Polymarket, log)",
+            "model_prob": "Modelo (log)",
+        },
+        height=550,
+    )
+    # linha y=x (perfeita calibração)
+    fig2.add_trace(
+        go.Scatter(
+            x=[0.0005, 0.5],
+            y=[0.0005, 0.5],
+            mode="lines",
+            line=dict(dash="dash", color="gray"),
+            name="modelo = mercado",
+        )
+    )
+    fig2.update_traces(textposition="top center", textfont=dict(size=9))
+    st.plotly_chart(fig2, use_container_width=True)
+
+    st.caption(
+        f"Overround ESPN (vig): {(calib['espn_raw_prob'].sum() - 1.0) * 100:.1f}% "
+        "(margem total da casa antes da normalização). "
+        "Polymarket é prediction market sem vig estruturado."
+    )
+
+
 st.divider()
 st.caption(
     "Fontes: martj42/international_results · eloratings.net · Transfermarkt (via GiveMeSport) · "
-    "ESPN power ranking · FIFA. Modelo v2: Dixon-Coles bayesiano (1997 + prior). "
+    "ESPN power ranking · ESPN/Polymarket odds · FIFA. "
+    "Modelo v2: Dixon-Coles bayesiano (1997 + prior). "
     "Pipeline em src/ · Relatórios: results/RELATORIO_v1.md, results/RELATORIO_v2.md."
 )
