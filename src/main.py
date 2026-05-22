@@ -17,6 +17,7 @@ from src.simulate.tournament import simulate_tournament, aggregate
 
 N_SIMULATIONS = 10_000
 HALF_LIFE = 365.0  # dias
+PRIOR_LAMBDA = 8.0  # força do prior bayesiano (Elo + market value)
 
 
 def main() -> None:
@@ -57,7 +58,7 @@ def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     ratings_wc.to_csv(RESULTS / "team_ratings.csv", index=False)
 
-    print(f"\n[3/4] Rodando {N_SIMULATIONS:,} simulações Monte Carlo...")
+    print(f"\n[4/5] Rodando {N_SIMULATIONS:,} simulações Monte Carlo...")
     rng = np.random.default_rng(42)
     fixtures = pd.read_csv(DATA_PROCESSED / "wc2026_fixtures.csv")
     sims = []
@@ -70,7 +71,7 @@ def main() -> None:
             print(f"  {i + 1:>5} / {N_SIMULATIONS}  ({elapsed:.1f}s, eta {eta:.0f}s)")
     print(f"  OK em {time.time() - t0:.1f}s")
 
-    print("\n[4/4] Agregando resultados...")
+    print("\n[5/5] Agregando resultados...")
     probs = aggregate(sims)
     probs.to_csv(RESULTS / "world_cup_probabilities.csv", index=False)
 

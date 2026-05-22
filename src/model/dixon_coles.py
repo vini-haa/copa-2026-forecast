@@ -55,6 +55,9 @@ def _neg_log_likelihood(
     weights: np.ndarray,
     neutral_mask: np.ndarray,
     n_teams: int,
+    prior_attack: np.ndarray | None = None,
+    prior_defense: np.ndarray | None = None,
+    prior_lambda: float = 0.0,
 ) -> float:
     attack = params[:n_teams]
     defense = params[n_teams : 2 * n_teams]
@@ -81,16 +84,31 @@ def _neg_log_likelihood(
 
     correction = np.clip(correction, 1e-10, None)
     log_lik = weights * (log_p_h + log_p_a + np.log(correction))
-    return -log_lik.sum()
+    nll = -log_lik.sum()
+
+    # Regularização bayesiana: puxa attack/defense em direção ao prior.
+    # Termo MAP: -log p(θ) = (λ/2) Σ (θ_i - μ_i)²
+    if prior_lambda > 0.0 and prior_attack is not None and prior_defense is not None:
+        nll += 0.5 * prior_lambda * np.sum((attack - prior_attack) ** 2)
+        nll += 0.5 * prior_lambda * np.sum((defense - prior_defense) ** 2)
+    return nll
 
 
 def fit(
     matches: pd.DataFrame,
     half_life_days: float = 365.0,
     reference_date: str | None = None,
+    priors: dict[str, tuple[float, float]] | None = None,
+    prior_lambda: float = 0.0,
 ) -> DixonColesParams:
     """Ajusta o modelo. `matches` precisa de: date, home_team, away_team,
-    home_score, away_score, neutral."""
+    home_score, away_score, neutral.
+
+    Args:
+        priors: dict opcional team -> (prior_attack, prior_defense).
+        prior_lambda: força do prior (0 = sem prior; 5-20 = moderado;
+            >50 = forte). Equivale ao inverso da variância do prior.
+    """
     df = matches.dropna(subset=["home_score", "away_score"]).copy()
     df["date"] = pd.to_datetime(df["date"])
     ref = pd.to_datetime(reference_date) if reference_date else df["date"].max()
@@ -108,7 +126,15 @@ def fit(
     ag = df["away_score"].astype(int).to_numpy()
     neutral = df["neutral"].astype(bool).to_numpy()
 
-    x0 = np.concatenate([np.zeros(n), np.zeros(n), [0.25, -0.05]])
+    prior_attack = np.zeros(n)
+    prior_defense = np.zeros(n)
+    if priors is not None:
+        for t, (a, d) in priors.items():
+            if t in idx:
+                prior_attack[idx[t]] = a
+                prior_defense[idx[t]] = d
+
+    x0 = np.concatenate([prior_attack.copy(), prior_defense.copy(), [0.25, -0.05]])
 
     # restrição: soma de ataques = 0 (identifiabilidade)
     constraints = [{"type": "eq", "fun": lambda p: p[:n].sum()}]
@@ -116,10 +142,21 @@ def fit(
     res = minimize(
         _neg_log_likelihood,
         x0,
-        args=(home_idx, away_idx, hg, ag, weights, neutral, n),
+        args=(
+            home_idx,
+            away_idx,
+            hg,
+            ag,
+            weights,
+            neutral,
+            n,
+            prior_attack,
+            prior_defense,
+            prior_lambda,
+        ),
         method="SLSQP",
         constraints=constraints,
-        options={"maxiter": 200, "ftol": 1e-7},
+        options={"maxiter": 300, "ftol": 1e-7},
     )
 
     attack = dict(zip(teams, res.x[:n]))
