@@ -286,8 +286,62 @@ with tab4:
     )
 
 
+# ---------------------- TAB 5: DADOS DE ENTRADA -----------------------------
+with tab5:
+    st.subheader("Dados que alimentam o modelo")
+    st.markdown(
+        "O modelo v2 (Bayesiano) usa **placar histórico** como fonte primária e "
+        "**Elo + valor de mercado** como prior."
+    )
+
+    elo_df = pd.read_csv(DATA_RAW / "elo_ratings_2026.csv")
+    mv_df = pd.read_csv(DATA_RAW / "market_value_2026.csv")
+    espn_df = pd.read_csv(DATA_RAW / "espn_power_ranking_2026.csv")
+
+    merged = (
+        espn_df.merge(elo_df, on="team", how="left")
+        .merge(mv_df[["team", "market_value_gbp_m", "source"]], on="team", how="left")
+        .rename(
+            columns={
+                "rank": "ESPN_rank",
+                "elo": "Elo",
+                "market_value_gbp_m": "Mkt_value_£M",
+                "source": "MV_source",
+            }
+        )
+    )
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Seleções com Elo", int(merged["Elo"].notna().sum()))
+    col2.metric("Seleções com Market Value", int(merged["Mkt_value_£M"].notna().sum()))
+    col3.metric("Total Mkt Value (£M)", f"{merged['Mkt_value_£M'].sum():,.0f}")
+
+    st.dataframe(
+        merged.sort_values("ESPN_rank"),
+        use_container_width=True,
+        hide_index=True,
+        height=600,
+    )
+
+    st.subheader("Correlação Elo × Market Value")
+    fig = px.scatter(
+        merged.dropna(subset=["Mkt_value_£M"]),
+        x="Elo",
+        y="Mkt_value_£M",
+        text="team",
+        log_y=True,
+        color="ESPN_rank",
+        color_continuous_scale="Turbo_r",
+        labels={"Mkt_value_£M": "Valor de mercado (£M, log)"},
+        height=500,
+    )
+    fig.update_traces(textposition="top center", textfont=dict(size=9))
+    st.plotly_chart(fig, use_container_width=True)
+
+
 st.divider()
 st.caption(
-    "Fontes: martj42/international_results · eloratings.net · FIFA. "
-    "Modelo: Dixon-Coles (1997). Pipeline em [src/](src/) · [Relatório completo](results/RELATORIO_v1.md)."
+    "Fontes: martj42/international_results · eloratings.net · Transfermarkt (via GiveMeSport) · "
+    "ESPN power ranking · FIFA. Modelo v2: Dixon-Coles bayesiano (1997 + prior). "
+    "Pipeline em src/ · Relatórios: results/RELATORIO_v1.md, results/RELATORIO_v2.md."
 )
