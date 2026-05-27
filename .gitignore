@@ -1,9 +1,16 @@
 __pycache__/
 *.pyc
+*.pyo
 .venv/
 venv/
+env/
 .env
+.DS_Store
 .ipynb_checkpoints/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+*.log
+*.tmp
 data/raw/*.html
 data/raw/*.tmp
-*.log
