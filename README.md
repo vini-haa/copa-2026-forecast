@@ -1,99 +1,68 @@
 # Copa do Mundo 2026 — Forecast Probabilístico
 
-> Modelagem estatística da Copa do Mundo de 2026 com **Dixon-Coles** e simulação
-> **Monte Carlo** (10.000 cenários). Estima probabilidades de classificação por
-> grupo, avanço por fase e título.
-
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ![Probabilidades de título](results/probabilities_top16.png)
 
-## Por que esse projeto?
+## A ideia
 
-Exercício autoral de modelagem probabilística aplicada a um problema real e
-verificável: prever a Copa do Mundo de 2026. Combina coleta de dados públicos,
-ajuste de modelo estatístico via MLE, simulação Monte Carlo e validação
-out-of-sample — o pipeline completo de um problema de previsão.
+Falta pouco pra Copa começar e eu queria saber, com algum rigor, **quem
+realmente tem chance de levantar a taça**. Não me bastava o "achismo" dos
+canais esportivos, nem o ranking da FIFA que mistura amistoso com final de
+Copa do Mundo no mesmo bolo.
 
-## Metodologia
+Então montei o que daria pra montar: peguei o histórico de todas as partidas
+de seleções desde 2022, ajustei um modelo estatístico que economista usa pra
+prever futebol há quase 30 anos (Dixon-Coles), simulei a Copa **10 mil vezes**
+e olhei a frequência com que cada seleção termina campeã.
 
-- **Coleta**: 49.329 partidas internacionais (1872-2026) do dataset público
-  [`martj42/international_results`](https://github.com/martj42/international_results),
-  enriquecido com Elo ratings (eloratings.net), valor de mercado dos elencos
-  (Transfermarkt) e odds de mercado (ESPN/Polymarket) para validação.
-  Filtragem para 4.421 partidas pós-2022 (ciclo atual).
+Spoiler: Espanha e Argentina disparam, Marrocos aparece bem mais alto do que o
+mercado de apostas precifica, e o modelo é cético com a França — que o
+mercado adora.
 
-- **Modelo Dixon-Coles** (Dixon & Coles, 1997): extensão do modelo de Poisson
-  para resultados de futebol. Estima por MLE um parâmetro de **ataque** e
-  **defesa** por seleção, mais um **home advantage** e uma **correção ρ** para
-  resultados de baixo placar (0-0, 1-0, 0-1, 1-1) que Poisson independente
-  subestima. Aplica decaimento exponencial (half-life de 365 dias) para que
-  jogos mais recentes pesem mais.
+## Como funciona
 
-- **Simulação Monte Carlo**: 10.000 torneios completos. Cada partida tem placar
-  amostrado da matriz Dixon-Coles. Mata-mata simula prorrogação como meio tempo
-  extra; pênaltis como 50/50. Probabilidades finais = frequência relativa de
-  cada seleção avançar/vencer.
+O pipeline é direto: **dado → modelo → simulação → resultado.**
 
-- **Validação out-of-sample**: backtest com treino até 2025-12-31 e teste em
-  165 partidas das eliminatórias de 2026. Modelo bate baselines (Elo puro,
-  uniforme) em Brier score (0,53), log-loss (0,90) e accuracy (55,8%).
+**Dado.** 4.421 partidas internacionais entre 2022 e 2026, do dataset público
+[`martj42/international_results`](https://github.com/martj42/international_results).
+Filtrei o ciclo atual porque o que aconteceu na Copa de 2014 tem pouca relação
+com a Holanda de 2026.
 
-## Arquitetura
+**Modelo.** Dixon-Coles (1997) é uma extensão do Poisson pra placares de
+futebol. Estima por máxima verossimilhança um parâmetro de **ataque** e um de
+**defesa** por seleção, mais um termo de **vantagem de mando** e uma correção
+pra placares baixos (0-0, 1-0, 1-1 — que o Poisson puro subestima). Jogos mais
+recentes pesam mais via decaimento exponencial (meia-vida de 1 ano).
 
-```
-copa-2026-forecast/
-├── src/
-│   ├── collect/             # coleta de dados
-│   │   ├── download_history.py    # baixa dataset histórico (martj42)
-│   │   └── build_fixtures.py      # extrai fixtures Copa 2026
-│   ├── features/
-│   │   └── build_features.py      # base de treino com filtro temporal
-│   ├── model/
-│   │   ├── dixon_coles.py         # MLE + correção placares baixos
-│   │   ├── priors.py              # priors Elo + market value (não usado no final)
-│   │   ├── calibration.py         # comparação modelo vs mercado
-│   │   └── backtest.py            # validação out-of-sample
-│   ├── simulate/
-│   │   └── tournament.py          # Monte Carlo do bracket 48 times
-│   ├── config.py                  # grupos, sedes, aliases de nomes
-│   ├── plots.py                   # gráficos para o README
-│   └── main.py                    # orquestrador end-to-end
-├── app.py                         # dashboard Streamlit (6 abas)
-├── data/
-│   ├── raw/                       # CSVs originais (datasets públicos)
-│   └── processed/                 # base de treino + fixtures
-├── results/                       # probabilidades, ratings, gráfico, relatório
-├── requirements.txt
-└── LICENSE
-```
+**Simulação.** 10.000 Copas inteiras: fase de grupos com critério de
+desempate, 8 melhores terceiros colocados, mata-mata com prorrogação e
+pênaltis. Em cada partida, sorteio um placar a partir da distribuição que o
+modelo prediz. A probabilidade de uma seleção ser campeã é a frequência com
+que ela vence as 10 mil simulações.
 
-## Como reproduzir
+**Validação.** Treinei só com dados até dezembro de 2025 e usei o modelo pra
+prever as 165 partidas das eliminatórias de janeiro a maio de 2026, que eu já
+sabia o resultado. Comparei contra três baselines (uniforme, Elo puro, e uma
+versão bayesiana mais "esperta" que tentei). O Dixon-Coles MLE puro ganhou em
+todas as métricas — Brier, log-loss e accuracy.
 
-```bash
-git clone https://github.com/vini-haa/copa-2026-forecast
-cd copa-2026-forecast
-pip install -r requirements.txt
+| Modelo                 | Brier ↓ | Log-loss ↓ | Accuracy ↑ |
+|------------------------|--------:|-----------:|-----------:|
+| Uniforme (chão)        | 0,667   | 1,099      | 43,6%      |
+| Elo puro               | 0,657   | 1,152      | 49,1%      |
+| **Dixon-Coles (MLE)**  | **0,533** | **0,895** | **55,8%**  |
 
-# Pipeline end-to-end
-python -m src.collect.download_history   # baixa ~7MB de CSVs
-python -m src.features.build_features    # gera base de treino
-python -m src.collect.build_fixtures     # extrai jogos Copa 2026
-python -m src.main                       # ajusta modelo + simula + reporta
-python -m src.plots                      # regenera gráfico do README
+> **Aprendizado honesto:** cheguei a montar uma versão "mais sofisticada" com
+> prior bayesiano usando Elo + valor de mercado dos elencos. Pareceu uma boa
+> ideia. O backtest mostrou que ficou **pior** — com 4 mil jogos de treino, o
+> MLE já estava bem informado e o prior só introduziu viés. Voltei pra versão
+> simples. Às vezes mais complexidade é só mais ruído.
 
-# Validação e diagnóstico (opcionais)
-python -m src.model.backtest             # backtest out-of-sample
-python -m src.model.calibration          # compara com odds de mercado
+## Os resultados
 
-# Dashboard interativo
-streamlit run app.py
-```
-
-## Resultados
-
-Top 8 seleções por probabilidade de título (10k simulações Monte Carlo):
+Top 8 favoritos (das 10k simulações):
 
 | Seleção     | P(Título) | P(Final) | P(Avançar) |
 |-------------|----------:|---------:|-----------:|
@@ -106,46 +75,85 @@ Top 8 seleções por probabilidade de título (10k simulações Monte Carlo):
 | França      |  5,26%    |  5,3%    | 91,4%      |
 | Colômbia    |  4,97%    |  5,0%    | 87,8%      |
 
-Probabilidades completas em [`results/world_cup_probabilities.csv`](results/world_cup_probabilities.csv).
-Análise consolidada em [`results/RELATORIO_FINAL.md`](results/RELATORIO_FINAL.md).
+Probabilidades das 48 seleções: [`results/world_cup_probabilities.csv`](results/world_cup_probabilities.csv).
+Análise grupo a grupo: [`results/RELATORIO_FINAL.md`](results/RELATORIO_FINAL.md).
 
-### Backtest out-of-sample
+**Onde o modelo discorda do mercado:** comparei com odds da ESPN e Polymarket.
+A maior divergência é a **França**: mercado dá 15,6%, modelo dá 5,3%. Eu
+interpreto como prêmio de reputação (campeã 2018, vice 2022) que o mercado
+cobra e o modelo não vê nos jogos recentes. Na outra ponta, **Argentina e
+Marrocos** estão sendo subestimados pelo mercado — favoritos do modelo que
+podem render aposta de valor pra quem gosta.
 
-| Modelo                  | Brier ↓ | Log-loss ↓ | Accuracy ↑ |
-|-------------------------|--------:|-----------:|-----------:|
-| Uniforme (chão teórico) | 0,667   | 1,099      | 43,6%      |
-| Elo puro                | 0,657   | 1,152      | 49,1%      |
-| **Dixon-Coles (MLE)**   | **0,533** | **0,895** | **55,8%**  |
+## Como rodar
 
-Testado em 165 partidas reais das eliminatórias jan-mai/2026, com treino até
-dez/2025. Detalhes em [`src/model/backtest.py`](src/model/backtest.py).
+```bash
+git clone https://github.com/vini-haa/copa-2026-forecast
+cd copa-2026-forecast
+pip install -r requirements.txt
 
-## Limitações conhecidas
+python -m src.collect.download_history   # baixa ~7MB de CSVs
+python -m src.features.build_features    # prepara base de treino
+python -m src.collect.build_fixtures     # extrai jogos da Copa
+python -m src.main                       # ajusta + simula + reporta
 
-- Modelo assume **independência entre partidas** (não captura "momentum" nem
-  efeito psicológico de eliminação em mata-mata).
-- Calibrado em **placares históricos**; não incorpora lesões nem escalações
-  finais (que serão conhecidas só em 02/06/2026).
-- Pesos exponenciais de decaimento temporal usando **half-life de 365 dias**
-  (padrão razoável; não tunado por validação).
-- Bracket pós-fase de grupos usa **cruzamento simétrico padrão** — a FIFA
-  ainda não confirmou cruzamentos oficiais para o formato de 48 times.
-- Vantagem de campo modelada apenas para o trio anfitrião (EUA/Canadá/México)
-  jogando em seus respectivos países.
+# opcionais:
+python -m src.model.backtest             # roda a validação out-of-sample
+python -m src.model.calibration          # compara com odds das casas
+streamlit run app.py                     # dashboard interativo (6 abas)
+```
+
+## Estrutura
+
+```
+copa-2026-forecast/
+├── src/
+│   ├── collect/       # ingestão dos dados
+│   ├── features/      # base de treino (filtro temporal + pesos)
+│   ├── model/         # Dixon-Coles, backtest, calibração
+│   ├── simulate/      # Monte Carlo do bracket de 48 times
+│   └── main.py        # orquestrador
+├── app.py             # dashboard Streamlit
+├── data/              # dados brutos e processados
+├── results/           # probabilidades, ratings, gráfico, relatório
+└── requirements.txt
+```
+
+## O que ficou de fora
+
+Por honestidade, o que **não** está no modelo:
+
+- **Lesões e escalações finais.** As listas de 23 só saem no dia 2 de junho.
+  Quando saírem, dá pra ajustar manualmente, mas hoje o modelo trata a
+  seleção como "o time médio que ela vem colocando em campo".
+- **Momentum / efeito psicológico.** Cada partida é tratada como independente.
+  Time que vem de goleada não ganha bônus, time que tomou virada no fim não
+  perde nada. Simplificação aceitável, mas é simplificação.
+- **Bracket oficial do mata-mata.** A FIFA ainda não confirmou os cruzamentos
+  do formato de 48 times. Usei um cruzamento simétrico padrão; quando saírem
+  os oficiais, é editar uma constante e re-rodar.
+- **Fadiga de viagem.** O torneio tem 3 países anfitriões e voos de até 5h
+  entre sedes. O modelo ignora isso.
 
 ## Stack
 
-Python 3.11+ · NumPy · Pandas · SciPy (otimização MLE) · Matplotlib · Streamlit · Plotly
+Python 3.11 · NumPy · Pandas · SciPy · Matplotlib · Streamlit · Plotly.
+
+A modelagem é simples de propósito: queria que o código fosse legível e o
+modelo, defensável. Quem quiser ir mais fundo, os hooks pra evoluir estão
+todos em `src/model/`.
 
 ## Referências
 
 - Dixon, M. J., & Coles, S. G. (1997). *Modelling Association Football Scores
-  and Inefficiencies in the Football Betting Market*. Journal of the Royal
-  Statistical Society: Series C (Applied Statistics), 46(2), 265–280.
-- Dataset histórico: [martj42/international_results](https://github.com/martj42/international_results) (CC0)
-- Elo ratings: [eloratings.net](https://www.eloratings.net/)
+  and Inefficiencies in the Football Betting Market*. JRSS C, 46(2), 265–280.
+- Dataset: [martj42/international_results](https://github.com/martj42/international_results) (CC0)
+- Elo: [eloratings.net](https://www.eloratings.net/)
 
 ## Autor
 
 **Vinicius Henrique Albino Andrade**
 [LinkedIn](https://www.linkedin.com/in/vini-haa/) · [GitHub](https://github.com/vini-haa)
+
+Se você é recrutador, dev curioso ou só fã de futebol que gostou da análise,
+me chama.
